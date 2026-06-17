@@ -1,78 +1,88 @@
 class_name GameData
 extends RefCounted
 #
-# 콘텐츠 데이터 — one-scroll-bible.com 본문(개역개정) 기반.
-# 성경 인용은 verbatim(그대로). 항해/해적 프레임은 사이트 FAQ a2(골 1:13 "옮기셨으니")에서 가져옴.
-# MVP 4기항지: 창조 → 타락 → 예수님(반전) → 회복(영접 기도). 추후 13기항지로 확장.
+# 콘텐츠 데이터 — one-scroll-bible.com 본문(개역개정) 기반. 성경 인용 verbatim.
+# 항해/해적 프레임은 사이트 FAQ a2(골 1:13 "옮기셨으니")에서 가져옴.
+# RPG 모델: 섬을 돌아다니며 NPC 근처에서 머리 위 말풍선. 클라이맥스(반전)·엔딩(기도)만 모달.
 #
-# speaker 표기: ""=내레이션, "안내자"=등불 든 동행자(매 항구 "예수님을 가리켜요"),
-#               "말씀"=핵심 구절, 그 외=시대 인물.
+# biome: 씬별 배경(바다/땅/가장자리/길 색 + 소품 decor).
+# npcs:  머리 위 말풍선 [{spr,x,yo,text}]. guide=등불 안내자(예수님 실).
 
 static func stops() -> Array:
 	return [
 		{
-			"key": "creation",
-			"title": "창조",
-			"tag": "구약 · 시작",
-			"npc": "npc_teal.png",
-			"fx": "creation",
-			"shard": "말씀",
-			"lines": [
-				{"speaker": "", "text": "하나님이 보시기에 “심히 좋은” 세상을 지으셨다."},
-				{"speaker": "뱃사람", "text": "엿새 동안 빛과 바다와 생명을 지으시고, 마지막에 사람을 하나님의 형상대로 지으셨어요."},
-				{"speaker": "말씀", "text": "“태초에 하나님이 천지를 창조하시니라” — 창세기 1:1"},
-				{"speaker": "안내자", "text": "이 세상은 ‘말씀’으로 지어졌습니다. 요한복음은 바로 그 말씀이 예수님이라 선언하죠. (요 1:1-3)"},
+			"key": "creation", "title": "창조", "tag": "구약 · 시작",
+			"one": "하나님이 보시기에 “심히 좋은” 세상을 지으셨다.",
+			"fx": "creation", "shard": "말씀",
+			"biome": {
+				"sea": Color8(46, 146, 184), "ground": Color8(104, 162, 84), "ground2": Color8(134, 188, 106),
+				"edge": Color8(226, 208, 150), "path": Color8(150, 118, 74), "title_color": Color8(180, 240, 200),
+				"decor": [["tree.png", 286, -110], ["tree.png", 70, 120], ["bush.png", 300, 70],
+					["flower_y.png", 56, -60], ["flower_w.png", 300, -40], ["flower_y.png", 250, 130], ["flower_r.png", 90, 60]],
+			},
+			"npcs": [
+				{"spr": "sign.png", "x": 78, "yo": -10, "text": "“태초에 하나님이 천지를 창조하시니라” — 창세기 1:1"},
+				{"spr": "npc_teal.png", "x": 116, "yo": 20, "text": "엿새 동안 빛과 바다와 생명을 지으시고, 사람을 하나님의 형상대로 지으셨어요."},
+				{"spr": "guide.png", "x": 300, "yo": 14, "guide": true, "text": "이 세상은 ‘말씀’으로 지어졌습니다. 그 말씀이 곧 예수님이세요. (요 1:1-3)"},
 			],
 		},
 		{
-			"key": "fall",
-			"title": "타락",
-			"tag": "구약 · 문제의 시작",
-			"npc": "npc_red.png",
-			"fx": "fall",
-			"shard": "여자의 후손",
-			"lines": [
-				{"speaker": "", "text": "죄가 들어와 사람과 하나님 사이가 끊어졌다."},
-				{"speaker": "나그네", "text": "아담과 하와가 선악과를 먹고 에덴에서 쫓겨났습니다. 죽음과 수고가 들어왔죠…"},
-				{"speaker": "말씀", "text": "“여자의 후손은 네 머리를 상하게 할 것이요” — 창세기 3:15"},
-				{"speaker": "안내자", "text": "타락 직후 주신 첫 복음의 약속입니다. ‘여자의 후손’이 뱀의 머리를 깨뜨릴 것 — 이분이 바로 예수님이십니다."},
+			"key": "fall", "title": "타락", "tag": "구약 · 문제의 시작",
+			"one": "죄가 들어와 사람과 하나님 사이가 끊어졌다.",
+			"fx": "fall", "shard": "여자의 후손",
+			"biome": {
+				"sea": Color8(64, 98, 120), "ground": Color8(96, 114, 80), "ground2": Color8(80, 98, 66),
+				"edge": Color8(150, 140, 110), "path": Color8(120, 96, 70), "title_color": Color8(210, 170, 160),
+				"decor": [["deadtree.png", 286, -104], ["deadtree.png", 64, 110], ["rock.png", 300, 60],
+					["reed.png", 250, 130], ["serpent.png", 280, -50], ["rock.png", 80, -40]],
+			},
+			"npcs": [
+				{"spr": "sign.png", "x": 78, "yo": -10, "text": "“여자의 후손은 네 머리를 상하게 할 것이요” — 창세기 3:15"},
+				{"spr": "npc_red.png", "x": 116, "yo": 20, "text": "아담과 하와가 선악과를 먹고 에덴에서 쫓겨났습니다… 죽음과 수고가 들어왔죠."},
+				{"spr": "guide.png", "x": 300, "yo": 14, "guide": true, "text": "심판 한가운데 주신 첫 복음의 약속이에요. 여자의 후손이 뱀의 머리를 깨뜨릴 것 — 예수님이세요."},
 			],
 		},
 		{
-			"key": "jesus",
-			"title": "예수님의 오심",
-			"tag": "신약 · 성취",
-			"npc": "npc_purple.png",
-			"fx": "jesus",
-			"reveal": true,
-			"lines": [
-				{"speaker": "", "text": "약속하신 메시아가 오셔서, 죽고, 다시 살아나셨다."},
-				{"speaker": "말씀", "text": "“말씀이 육신이 되어 우리 가운데 거하시매 은혜와 진리가 충만하더라” — 요한복음 1:14"},
-				{"speaker": "안내자", "text": "여자의 후손, 아브라함의 복, 유월절 어린 양, 다윗의 영원한 왕 — 모두 이 한 분 예수님 안에서 이루어집니다."},
+			"key": "jesus", "title": "예수님의 오심", "tag": "신약 · 성취",
+			"one": "약속하신 메시아가 오셔서, 죽고, 다시 살아나셨다.",
+			"fx": "jesus", "reveal": true,
+			"biome": {
+				"sea": Color8(40, 82, 122), "ground": Color8(122, 130, 112), "ground2": Color8(148, 152, 136),
+				"edge": Color8(162, 162, 168), "path": Color8(142, 130, 102), "title_color": Color8(255, 244, 200),
+				"decor": [["pillar.png", 64, -96], ["pillar.png", 296, -96], ["pillar.png", 64, 110], ["pillar.png", 296, 110],
+					["cross.png", 180, -86], ["ship_pirate.png", 286, 120]],
+			},
+			"npcs": [
+				{"spr": "sign.png", "x": 78, "yo": -10, "text": "“말씀이 육신이 되어 우리 가운데 거하시매 은혜와 진리가 충만하더라” — 요한복음 1:14"},
+				{"spr": "npc_purple.png", "x": 116, "yo": 20, "text": "약속하신 메시아가 오셔서, 죽고, 다시 살아나셨습니다."},
+				{"spr": "guide.png", "x": 300, "yo": 14, "guide": true, "text": "여자의 후손·아브라함의 복·유월절 양·다윗의 왕 — 모두 이 한 분 안에서 이뤄집니다."},
+			],
+			"reveal_lines": [
 				{"speaker": "안내자", "text": "그런데… 당신이 타고 온 저 배를 보세요."},
 				{"speaker": "안내자", "text": "검은 깃발. 당신은 줄곧 ‘해적선’에 타고 있었습니다."},
-				{"speaker": "안내자", "text": "갑판을 아무리 깨끗이 닦아도, 그 배는 심판의 항구로 향합니다. 문제는 행동이 아니라 ‘어느 배에 속했는가’예요."},
-				{"speaker": "안내자", "text": "그래서 복음은 “더 착해져라”가 아니라 — “배를 옮겨 타라”고 말합니다. (골 1:13)"},
+				{"speaker": "안내자", "text": "갑판을 아무리 닦아도 그 배는 심판의 항구로 향합니다. 문제는 행동이 아니라 ‘어느 배에 속했는가’예요."},
+				{"speaker": "안내자", "text": "그래서 복음은 “더 착해져라”가 아니라 — “배를 옮겨 타라”입니다. (골 1:13)"},
 			],
 		},
 		{
-			"key": "restoration",
-			"title": "회복",
-			"tag": "신약 · 완성",
-			"npc": "guide.png",
-			"fx": "restoration",
-			"ending": true,
-			"lines": [
-				{"speaker": "", "text": "예수님이 다시 오셔서 모든 것을 새롭게 하신다."},
-				{"speaker": "말씀", "text": "“모든 눈물을 그 눈에서 닦아 주시니 다시는 사망이 없고…” — 요한계시록 21:4"},
-				{"speaker": "안내자", "text": "저기 빛나는 구조선이 당신을 기다립니다. 손 내미시는 그분을 믿고, 이제 건너오시겠어요?"},
+			"key": "restoration", "title": "회복", "tag": "신약 · 완성",
+			"one": "예수님이 다시 오셔서 모든 것을 새롭게 하신다.",
+			"fx": "restoration", "ending": true,
+			"biome": {
+				"sea": Color8(92, 176, 184), "ground": Color8(150, 172, 120), "ground2": Color8(188, 202, 152),
+				"edge": Color8(238, 226, 172), "path": Color8(182, 152, 102), "title_color": Color8(255, 236, 170),
+				"decor": [["citywall.png", 70, -110], ["citywall.png", 290, -110], ["citywall.png", 180, -120],
+					["tree.png", 296, 70], ["flower_w.png", 60, 60], ["ship_rescue.png", 180, -120]],
+			},
+			"npcs": [
+				{"spr": "sign.png", "x": 78, "yo": -10, "text": "“모든 눈물을 그 눈에서 닦아 주시니 다시는 사망이 없고…” — 요한계시록 21:4"},
+				{"spr": "guide.png", "x": 300, "yo": 14, "guide": true, "text": "저기 빛나는 구조선이 당신을 기다립니다. 손 내미시는 그분께, 이제 건너오시겠어요?"},
 			],
 		},
 	]
 
 
 static func prayer_lines() -> Array:
-	# 영접 기도 — one-scroll-bible.com respond.prayer verbatim
 	return [
 		"하나님,",
 		"저는 스스로를 구원할 수 없는 죄인임을 인정합니다.",

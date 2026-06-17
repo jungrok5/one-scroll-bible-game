@@ -1,20 +1,21 @@
 extends Node2D
 #
-# 한눈에 보는 성경 이야기 — 항해 (MVP 수직 슬라이스)
-# 위로 항해(조이스틱) → 기항지마다 NPC 말풍선 + 연출 → 예수님 항구에서 '해적선' 반전
-# → 회복 항구에서 영접 기도 → 구조선으로 갈아타고 일출 엔딩.
-# 모바일 세로 360×640. 픽셀 스프라이트는 nearest + 2배 확대, UI는 캔버스 해상도라 또렷.
+# 한눈에 보는 성경 이야기 — 항해 (RPG 오버월드)
+# 섬을 자유로이 돌아다니며(좌우는 바다라 막힘) NPC 근처에서 머리 위 말풍선.
+# 씬마다 바이옴(배경) 다름. 위로 항해 → 예수님 항구 '해적선' 반전(모달) → 회복 영접 기도(모달).
 
 const VW := 360.0
 const VH := 640.0
-const PATH_X := 120.0
-const PATH_W := 120.0
+const PATH_X := 132.0
+const PATH_W := 96.0
 const SPRITE_SCALE := 2.0
-const PORT_GAP := 640.0
-const FIRST := 440.0
+const PORT_GAP := 700.0
+const FIRST := 460.0
+const ISLAND_H := 190.0
+const NPC_RADIUS := 86.0
 
 var stops: Array = []
-var ports: Array = []           # [{ y, data, visited }]
+var ports: Array = []           # [{y, data, entered, completed}]
 var cur: int = 0
 var in_dialogue: bool = false
 var ended: bool = false
@@ -33,12 +34,12 @@ var hint_label: Label
 
 var rescue_ship: Sprite2D
 var theme_res: Theme
-
 var vignette: TextureRect
 var shard_box: Control
 var shards: Array = []
 var _dot_tex: Texture2D
 var _shake: float = 0.0
+var npc_entries: Array = []      # [{bubble, pos:Vector2}]
 
 
 func _ready() -> void:
@@ -56,9 +57,9 @@ func _ready() -> void:
 		add_child(ap)
 
 
-# ---------- setup ----------
 func _setup_input() -> void:
-	for pair in [["move_up", [KEY_UP, KEY_W]], ["move_down", [KEY_DOWN, KEY_S]]]:
+	for pair in [["move_up", [KEY_UP, KEY_W]], ["move_down", [KEY_DOWN, KEY_S]],
+			["move_left", [KEY_LEFT, KEY_A]], ["move_right", [KEY_RIGHT, KEY_D]]]:
 		var a: String = pair[0]
 		if not InputMap.has_action(a):
 			InputMap.add_action(a)
@@ -76,10 +77,6 @@ func _setup_font() -> void:
 		var r = load("res://assets/fonts/NotoSansKR-Bold.woff2")
 		if r is Font:
 			f = r
-	if f == null:
-		var ff := FontFile.new()
-		if ff.load_dynamic_font("res://assets/fonts/NotoSansKR-Bold.woff2") == OK:
-			f = ff
 	if f != null:
 		theme_res.default_font = f
 	get_tree().root.theme = theme_res
@@ -91,35 +88,36 @@ func _build_world() -> void:
 	add_child(world)
 
 	var n := stops.size()
-	var top_port_y := 360.0
+	var top_port_y := 380.0
 	for i in n:
 		var py := top_port_y + float(n - 1 - i) * PORT_GAP
-		ports.append({"y": py, "data": stops[i], "visited": false})
+		ports.append({"y": py, "data": stops[i], "entered": false, "completed": false})
 	var start_y: float = ports[0]["y"] + FIRST
-	world_height = start_y + 220.0
+	world_height = start_y + 240.0
 
-	# 바다(전체) · 항로(중앙 띠)
-	_rect(world, 0, 0, VW, world_height, Color8(40, 110, 150), 0)
-	_rect(world, PATH_X, 0, PATH_W, world_height, Color8(150, 110, 70), 1)
+	# 기본 바다(전체)
+	_rect(world, 0, 0, VW, world_height, Color8(38, 92, 120), -3)
+	# 전 구간 중앙 부두
+	_rect(world, PATH_X, 0, PATH_W, world_height, Color8(140, 104, 64), 1)
 	for y in range(0, int(world_height), 26):
-		_rect(world, PATH_X, y, PATH_W, 4, Color8(120, 86, 52), 1)
+		_rect(world, PATH_X, y, PATH_W, 4, Color8(112, 80, 48), 1)
 
 	for i in n:
 		_build_island(i)
 
-	# 출발 지점의 해적선 + 플레이어
-	_spr(world, "ship_pirate.png", VW * 0.5, start_y + 40, 4)
+	_spr(world, "ship_pirate.png", VW * 0.5, start_y + 46, 4)
 
 	player = Player.new()
 	player.position = Vector2(VW * 0.5, start_y)
-	player.min_y = top_port_y - 70.0
+	player.min_y = top_port_y - 60.0
 	player.max_y = start_y
 	player.z_index = 10
+	player.bounds_provider = Callable(self, "x_bounds")
 	world.add_child(player)
 
 	camera = Camera2D.new()
 	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 6.0
+	camera.position_smoothing_speed = 5.0
 	camera.limit_left = 0
 	camera.limit_right = int(VW)
 	camera.limit_top = 0
@@ -135,29 +133,44 @@ func _build_world() -> void:
 func _build_island(i: int) -> void:
 	var data: Dictionary = ports[i]["data"]
 	var py: float = ports[i]["y"]
-	_rect(world, 0, py - 200, VW, 400, Color8(108, 150, 86), 2)
-	_rect(world, 0, py - 200, VW, 14, Color8(214, 196, 138), 2)
-	_rect(world, 0, py + 186, VW, 14, Color8(214, 196, 138), 2)
-	_rect(world, PATH_X, py - 200, PATH_W, 400, Color8(150, 110, 70), 3)
+	var b: Dictionary = data["biome"]
 
-	_spr(world, "sign.png", 86, py - 8, 5)
-	_spr(world, data.get("npc", "npc_red.png"), 104, py + 16, 5)
-	_spr(world, "guide.png", VW - 60, py + 12, 5)
-	_spr(world, "lantern.png", VW - 38, py + 2, 6)
+	# 바이옴 바다 띠(섬 주변) → 땅 → 가장자리
+	_rect(world, 0, py - ISLAND_H - 110, VW, ISLAND_H * 2.0 + 220, b["sea"], -2)
+	_rect(world, 0, py - ISLAND_H, VW, ISLAND_H * 2.0, b["ground"], 0)
+	_rect(world, 0, py - ISLAND_H, VW, 12, b["edge"], 0)
+	_rect(world, 0, py + ISLAND_H - 12, VW, 12, b["edge"], 0)
+	# 땅 얼룩
+	for k in 12:
+		var sx := randf_range(8, VW - 16)
+		var sy := randf_range(py - ISLAND_H + 16, py + ISLAND_H - 16)
+		_rect(world, sx, sy, 6, 6, b["ground2"], 0)
+	# 섬 구간 부두
+	_rect(world, PATH_X, py - ISLAND_H, PATH_W, ISLAND_H * 2.0, b["path"], 1)
 
-	match data.get("key", ""):
-		"creation":
-			_spr(world, "tree.png", 288, py - 96, 5)
-			_spr(world, "bush.png", 56, py + 90, 5)
-		"fall":
-			_spr(world, "serpent.png", 268, py - 56, 6)
-			_spr(world, "tree.png", 288, py - 92, 5)
-		"jesus":
-			_spr(world, "ship_pirate.png", 278, py + 96, 4)
-			_spr(world, "cross.png", VW * 0.5, py - 86, 6)
-		"restoration":
-			rescue_ship = _spr(world, "ship_rescue.png", VW * 0.5, py - 110, 4)
-			_spr(world, "tree.png", 292, py + 70, 5)
+	# 소품
+	for d in b["decor"]:
+		_spr(world, d[0], float(d[1]), py + float(d[2]), 3)
+
+	# NPC + 머리 위 말풍선
+	for npc in data["npcs"]:
+		var nx: float = float(npc["x"])
+		var ny: float = py + float(npc["yo"])
+		_spr(world, npc["spr"], nx, ny, 5)
+		if npc.get("guide", false):
+			_spr(world, "lantern.png", nx + 22, ny - 8, 6)
+		var bub := SpeechBubble.new()
+		bub.position = Vector2(nx, ny - 18)
+		world.add_child(bub)
+		bub.set_text(npc["text"])
+		npc_entries.append({"bubble": bub, "pos": Vector2(nx, ny)})
+
+
+func x_bounds(y: float) -> Vector2:
+	for p in ports:
+		if absf(y - p["y"]) <= ISLAND_H - 6.0:
+			return Vector2(34.0, VW - 34.0)
+	return Vector2(PATH_X + 14.0, PATH_X + PATH_W - 14.0)
 
 
 # ---------- ui ----------
@@ -165,7 +178,6 @@ func _build_ui() -> void:
 	ui = CanvasLayer.new()
 	add_child(ui)
 
-	# 비네트(어두운 가장자리) — 부드럽게 보이도록 linear 필터
 	vignette = TextureRect.new()
 	vignette.texture = load("res://assets/sprites/vignette.png")
 	vignette.position = Vector2.ZERO
@@ -175,7 +187,6 @@ func _build_ui() -> void:
 	vignette.modulate = Color(1, 1, 1, 0.0)
 	ui.add_child(vignette)
 
-	# 약속의 빛 조각 행(상단)
 	shard_box = Control.new()
 	shard_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(shard_box)
@@ -191,15 +202,15 @@ func _build_ui() -> void:
 		hud_dots.append(d)
 
 	hint_label = Label.new()
-	hint_label.text = "위로 항해하세요"
+	hint_label.text = "조이스틱으로 자유롭게 — 위로 항해하세요"
 	hint_label.position = Vector2(0, 54)
 	hint_label.size = Vector2(VW, 26)
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
-	hint_label.add_theme_font_size_override("font_size", 19)
+	hint_label.add_theme_font_size_override("font_size", 16)
 	ui.add_child(hint_label)
 	var ht := create_tween()
-	ht.tween_interval(3.0)
+	ht.tween_interval(3.5)
 	ht.tween_property(hint_label, "modulate:a", 0.0, 1.0)
 
 	joystick = VirtualJoystick.new()
@@ -215,9 +226,8 @@ func _set_hud(done: int) -> void:
 		hud_dots[i].color = Color(1.0, 0.82, 0.35, 1.0) if i < done else Color(1, 1, 1, 0.25)
 
 
-# ---------- game loop ----------
-func _process(_delta: float) -> void:
-	# 카메라 흔들림
+# ---------- loop ----------
+func _process(delta: float) -> void:
 	if camera != null:
 		if _shake > 0.15:
 			camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
@@ -225,45 +235,101 @@ func _process(_delta: float) -> void:
 		elif camera.offset != Vector2.ZERO:
 			camera.offset = Vector2.ZERO
 
+	# NPC 근접 말풍선
+	var can_talk := not in_dialogue and not ended
+	for e in npc_entries:
+		var near: bool = can_talk and player.position.distance_to(e["pos"]) < NPC_RADIUS
+		if near:
+			e["bubble"].appear()
+		else:
+			e["bubble"].vanish()
+
 	if in_dialogue or cur >= ports.size():
 		return
-	var p: Dictionary = ports[cur]
-	if not p["visited"] and player.position.y <= p["y"]:
-		_trigger_port(cur)
+	var port: Dictionary = ports[cur]
+	var py: float = port["y"]
+	if not port["entered"] and player.position.y <= py + 170.0:
+		_enter_port(cur)
+	elif port["entered"] and not port["completed"]:
+		var done_y: float = py if port["data"].get("ending", false) else py - 150.0
+		if player.position.y <= done_y:
+			_complete_port(cur)
 
 
 func shake(amount: float) -> void:
 	_shake = maxf(_shake, amount)
 
 
-func _trigger_port(idx: int) -> void:
-	in_dialogue = true
-	player.locked = true
+func _enter_port(idx: int) -> void:
+	ports[idx]["entered"] = true
 	var data: Dictionary = ports[idx]["data"]
-	_play_fx(data.get("fx", ""), ports[idx]["y"])
-	dialogue.start(data["lines"], Callable(self, "_on_port_done"))
+	var py: float = ports[idx]["y"]
+	_play_fx(data.get("fx", ""), py)
+	_scene_title(data.get("title", ""), data.get("one", ""), data["biome"].get("title_color", Color(1, 1, 1)))
+	if data.get("reveal", false):
+		_start_reveal(idx)
 
 
-func _on_port_done() -> void:
-	ports[cur]["visited"] = true
-	_set_hud(cur + 1)
-	var data: Dictionary = ports[cur]["data"]
+func _complete_port(idx: int) -> void:
+	ports[idx]["completed"] = true
+	_set_hud(idx + 1)
+	var data: Dictionary = ports[idx]["data"]
 	var shard: String = data.get("shard", "")
 	if shard != "":
 		_add_shard(shard)
 	if data.get("ending", false):
 		_start_ending()
 		return
+	cur += 1
+
+
+func _start_reveal(idx: int) -> void:
+	in_dialogue = true
+	player.locked = true
+	var lines: Array = ports[idx]["data"].get("reveal_lines", [])
+	await get_tree().create_timer(1.6).timeout
+	shake(8.0)
+	_flash(Color(1, 1, 1, 0.5))
+	dialogue.start(lines, Callable(self, "_reveal_done"))
+
+
+func _reveal_done() -> void:
 	in_dialogue = false
 	player.locked = false
-	cur += 1
+
+
+# ---------- scene title ----------
+func _scene_title(title: String, sub: String, col: Color) -> void:
+	var t := Label.new()
+	t.text = title
+	t.position = Vector2(0, VH * 0.32)
+	t.size = Vector2(VW, 40)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t.add_theme_color_override("font_color", col)
+	t.add_theme_font_size_override("font_size", 34)
+	ui.add_child(t)
+	var s := Label.new()
+	s.text = sub
+	s.position = Vector2(24, VH * 0.32 + 44)
+	s.size = Vector2(VW - 48, 60)
+	s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	s.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	s.add_theme_font_size_override("font_size", 15)
+	ui.add_child(s)
+	for lbl in [t, s]:
+		lbl.modulate.a = 0.0
+		var tw := create_tween()
+		tw.tween_property(lbl, "modulate:a", 1.0, 0.5)
+		tw.tween_interval(2.0)
+		tw.tween_property(lbl, "modulate:a", 0.0, 0.8)
+		tw.tween_callback(lbl.queue_free)
 
 
 # ---------- fx ----------
 func _play_fx(key: String, py: float) -> void:
 	match key:
 		"creation":
-			# 어둠 → 천둥 → 빛이 있으라
 			canvas_mod.color = Color(0.18, 0.2, 0.34)
 			_vig(0.5)
 			_lightning(py)
@@ -277,12 +343,10 @@ func _play_fx(key: String, py: float) -> void:
 			_rays(py, Color(1.0, 0.95, 0.7, 0.5), 2.5)
 			_weather("motes", py)
 		"fall":
-			# 샬롬이 깨짐 — 채도 빠지고 잎이 진다
-			_grade(Color(0.6, 0.55, 0.58), 1.2)
+			_grade(Color(0.62, 0.56, 0.58), 1.2)
 			_vig(0.5)
 			_weather("petals", py)
 		"jesus":
-			# 최암흑 → 빛 폭발 → 빛 조각 합체(부활)
 			_grade(Color(0.3, 0.32, 0.46), 0.6)
 			_vig(0.62)
 			await get_tree().create_timer(0.8).timeout
@@ -353,13 +417,11 @@ func _add_shard(label: String) -> void:
 	var s := TextureRect.new()
 	s.texture = _dot_tex
 	s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	s.custom_minimum_size = Vector2(14, 14)
 	s.size = Vector2(14, 14)
 	s.modulate = Color(1.0, 0.85, 0.4, 0.0)
 	s.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shard_box.add_child(s)
 	shards.append(s)
-	# 상단 중앙에 한 줄로 재배치
 	var n := shards.size()
 	for i in n:
 		shards[i].position = Vector2(VW * 0.5 - float(n - 1) * 11.0 + float(i) * 22.0 - 7.0, 40.0)
@@ -380,8 +442,10 @@ func _converge_shards(target: Vector2) -> void:
 		ft.tween_callback(func() -> void: _flash(Color(1, 1, 1, 0.7)))
 
 
-# ---------- ending: prayer → ship swap → closing ----------
+# ---------- ending ----------
 func _start_ending() -> void:
+	in_dialogue = true
+	player.locked = true
 	_show_prayer()
 
 
@@ -398,33 +462,30 @@ func _panel_overlay(bg_alpha: float) -> Control:
 	return c
 
 
-func _make_label(parent: Node, txt: String, fs: int, col: Color, center: bool = true) -> Label:
+func _make_label(parent: Node, txt: String, fs: int, col: Color) -> Label:
 	var l := Label.new()
 	l.text = txt
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.add_theme_color_override("font_color", col)
 	l.add_theme_font_size_override("font_size", fs)
-	if center:
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	parent.add_child(l)
 	return l
 
 
 func _show_prayer() -> void:
-	var overlay := _panel_overlay(0.80)
+	var overlay := _panel_overlay(0.8)
 	var box := VBoxContainer.new()
 	box.position = Vector2(24, 64)
 	box.size = Vector2(VW - 48, VH - 130)
 	box.add_theme_constant_override("separation", 10)
 	overlay.add_child(box)
-
 	_make_label(box, "그래서, 나는 어떻게?", 22, Color(1.0, 0.85, 0.45))
 	_make_label(box, "천천히 한 문장씩 따라 읽어 보세요.", 14, Color(1, 1, 1, 0.72))
 	_spacer(box, 8)
 	for line in GameData.prayer_lines():
 		_make_label(box, line, 18, Color(0.97, 0.97, 0.99))
 	_spacer(box, 8)
-
 	var btn := Button.new()
 	btn.text = "함께 기도했어요"
 	btn.custom_minimum_size = Vector2(0, 50)
@@ -437,7 +498,6 @@ func _show_prayer() -> void:
 
 
 func _do_ship_swap() -> void:
-	# 구조선으로 건너가는 순간 일출이 터진다
 	_vig(0.0)
 	if rescue_ship != null:
 		_rays(rescue_ship.position.y + 210.0, Color(1.0, 0.92, 0.62, 0.7), 3.0)
@@ -447,7 +507,7 @@ func _do_ship_swap() -> void:
 	t.set_parallel(true)
 	t.tween_property(canvas_mod, "color", Color(1.05, 1.0, 0.85), 1.6)
 	if rescue_ship != null:
-		t.tween_property(player, "position", rescue_ship.position + Vector2(0, 22), 1.5).set_trans(Tween.TRANS_SINE)
+		t.tween_property(player, "position", rescue_ship.position + Vector2(0, 24), 1.5).set_trans(Tween.TRANS_SINE)
 	t.set_parallel(false)
 	t.tween_interval(0.5)
 	t.tween_callback(_show_closing)
@@ -461,28 +521,21 @@ func _show_closing() -> void:
 	box.size = Vector2(VW - 48, VH - 150)
 	box.add_theme_constant_override("separation", 12)
 	overlay.add_child(box)
-
 	_make_label(box, "새 배에 오르셨습니다", 22, Color(1.0, 0.88, 0.5))
 	_make_label(box, GameData.after_text(), 17, Color(0.97, 0.97, 0.99))
 	_make_label(box, GameData.after_verse(), 15, Color(0.85, 0.92, 1.0))
 	_spacer(box, 10)
-
 	var more := Button.new()
 	more.text = "더 알아보기 · one-scroll-bible.com"
 	more.custom_minimum_size = Vector2(0, 46)
 	more.add_theme_font_size_override("font_size", 16)
 	box.add_child(more)
-	more.pressed.connect(func() -> void:
-		OS.shell_open(GameData.SITE_URL)
-	)
-
+	more.pressed.connect(func() -> void: OS.shell_open(GameData.SITE_URL))
 	var again := Button.new()
 	again.text = "처음부터 다시"
 	again.custom_minimum_size = Vector2(0, 42)
 	box.add_child(again)
-	again.pressed.connect(func() -> void:
-		get_tree().reload_current_scene()
-	)
+	again.pressed.connect(func() -> void: get_tree().reload_current_scene())
 
 
 # ---------- helpers ----------
@@ -510,4 +563,6 @@ func _spr(parent: Node, tex: String, x: float, y: float, z: int = 5) -> Sprite2D
 	s.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
 	s.z_index = z
 	parent.add_child(s)
+	if tex == "ship_rescue.png":
+		rescue_ship = s
 	return s

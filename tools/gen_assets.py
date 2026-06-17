@@ -168,6 +168,50 @@ def tile_plank():
 def waterfx():  # a small foam/sparkle used for shimmer
     g=G(6,3); g.rect(0,1,5,1,(180,220,235)); g.set(1,0,(220,240,250)); g.png("sparkle.png")
 
+def flower(name, top):
+    g=G(7,10)
+    g.rect(3,4,3,9,(70,120,70))
+    g.disc(3.5,3,2.6,(40,40,46)); g.disc(3.5,3,2.0,top); g.set(3,3,(250,240,180))
+    g.png(name)
+
+def rock():
+    g=G(12,8)
+    g.disc(4,5,3.2,(70,74,82)); g.disc(8,5,3.0,(70,74,82)); g.rect(2,5,10,7,(70,74,82))
+    g.disc(4,4,2.4,(120,126,134)); g.disc(8,4,2.2,(120,126,134))
+    g.png("rock.png")
+
+def deadtree():
+    g=G(16,22)
+    g.rect(7,10,9,21,(78,60,44))
+    for (x0,y0,x1,y1) in ((8,11,3,5),(8,12,13,6),(8,9,7,3),(8,10,11,3)):
+        n=8
+        for s in range(n+1):
+            t=s/n; g.set(int(x0+(x1-x0)*t),int(y0+(y1-y0)*t),(78,60,44))
+    g.png("deadtree.png")
+
+def reed():
+    g=G(10,14)
+    for x in (2,5,8):
+        for y in range(3,14): g.set(x,y,(60,90,54))
+        g.set(x-1,5,(60,90,54)); g.set(x+1,8,(60,90,54))
+    g.png("reed.png")
+
+def pillar():
+    g=G(12,24)
+    g.rect(1,1,10,3,(184,180,164)); g.rect(1,20,10,23,(184,180,164))
+    g.rect(2,3,9,21,(152,148,134)); g.rect(4,3,4,21,(172,168,154)); g.rect(7,3,7,21,(132,128,116))
+    g.png("pillar.png")
+
+def lily():
+    g=G(10,5); g.disc(4,2.5,2.4,(60,120,80)); g.disc(7,2.5,1.8,(60,120,80)); g.set(4,2,(120,170,120)); g.png("lily.png")
+
+def citywall():
+    g=G(18,16)
+    g.rect(0,5,17,15,(238,230,184))
+    for x in (1,6,11,16): g.rect(x-1,2,x+1,5,(238,230,184))
+    g.rect(7,9,10,15,(212,198,152))
+    g.png("citywall.png")
+
 def dot():  # soft round particle (linear-filtered in engine)
     g=G(8,8)
     g.disc(4,4,3.6,(255,255,255,60)); g.disc(4,4,2.4,(255,255,255,150)); g.disc(4,4,1.2,(255,255,255,255))
@@ -195,4 +239,6 @@ ship("ship_rescue.png",(150,110,80),(248,248,250),(244,210,120),cross=True)
 sign(); cross(); serpent(); tree(); bush()
 tile_water(); tile_grass(); tile_sand(); tile_plank(); waterfx()
 dot(); vignette()
+flower("flower_y.png",(245,210,70)); flower("flower_r.png",(220,90,90)); flower("flower_w.png",(240,240,245))
+rock(); deadtree(); reed(); pillar(); lily(); citywall()
 print("done.")
