@@ -95,12 +95,9 @@ func _build_world() -> void:
 	var start_y: float = ports[0]["y"] + FIRST
 	world_height = start_y + 240.0
 
-	# 기본 바다(전체)
-	_rect(world, 0, 0, VW, world_height, Color8(38, 92, 120), -3)
-	# 전 구간 중앙 부두
-	_rect(world, PATH_X, 0, PATH_W, world_height, Color8(140, 104, 64), 1)
-	for y in range(0, int(world_height), 26):
-		_rect(world, PATH_X, y, PATH_W, 4, Color8(112, 80, 48), 1)
+	# 기본 바다(전체, 타일) + 중앙 부두(흙길 타일)
+	_tile(world, 0, 0, VW, world_height, "tile_water.png", Color(0.82, 0.96, 1.06), -3)
+	_tile(world, PATH_X, 0, PATH_W, world_height, "tile_dirt.png", Color(0.92, 0.8, 0.6), 1)
 
 	for i in n:
 		_build_island(i)
@@ -135,18 +132,13 @@ func _build_island(i: int) -> void:
 	var py: float = ports[i]["y"]
 	var b: Dictionary = data["biome"]
 
-	# 바이옴 바다 띠(섬 주변) → 땅 → 가장자리
-	_rect(world, 0, py - ISLAND_H - 110, VW, ISLAND_H * 2.0 + 220, b["sea"], -2)
-	_rect(world, 0, py - ISLAND_H, VW, ISLAND_H * 2.0, b["ground"], 0)
-	_rect(world, 0, py - ISLAND_H, VW, 12, b["edge"], 0)
-	_rect(world, 0, py + ISLAND_H - 12, VW, 12, b["edge"], 0)
-	# 땅 얼룩
-	for k in 12:
-		var sx := randf_range(8, VW - 16)
-		var sy := randf_range(py - ISLAND_H + 16, py + ISLAND_H - 16)
-		_rect(world, sx, sy, 6, 6, b["ground2"], 0)
-	# 섬 구간 부두
-	_rect(world, PATH_X, py - ISLAND_H, PATH_W, ISLAND_H * 2.0, b["path"], 1)
+	# 바이옴 바다 띠(섬 주변) → 땅(타일) → 가장자리
+	_tile(world, 0, py - ISLAND_H - 110, VW, ISLAND_H * 2.0 + 220, "tile_water.png", b["sea_tint"], -2)
+	_tile(world, 0, py - ISLAND_H, VW, ISLAND_H * 2.0, b["ground_tile"], b["ground_tint"], 0)
+	_rect(world, 0, py - ISLAND_H, VW, 10, b["edge"], 0)
+	_rect(world, 0, py + ISLAND_H - 10, VW, 10, b["edge"], 0)
+	# 섬 구간 흙길
+	_tile(world, PATH_X, py - ISLAND_H, PATH_W, ISLAND_H * 2.0, "tile_dirt.png", Color(0.92, 0.8, 0.6), 1)
 
 	# 소품
 	for d in b["decor"]:
@@ -156,7 +148,8 @@ func _build_island(i: int) -> void:
 	for npc in data["npcs"]:
 		var nx: float = float(npc["x"])
 		var ny: float = py + float(npc["yo"])
-		_spr(world, npc["spr"], nx, ny, 5)
+		var ns := _spr(world, npc["spr"], nx, ny, 5)
+		_bob(ns)
 		if npc.get("guide", false):
 			_spr(world, "lantern.png", nx + 22, ny - 8, 6)
 		var bub := SpeechBubble.new()
@@ -554,6 +547,27 @@ func _rect(parent: Node, x: float, y: float, w: float, h: float, col: Color, z: 
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(r)
 	return r
+
+
+func _tile(parent: Node, x: float, y: float, w: float, h: float, texname: String, mod: Color, z: int = 0) -> TextureRect:
+	var t := TextureRect.new()
+	t.texture = load("res://assets/sprites/" + texname)
+	t.stretch_mode = TextureRect.STRETCH_TILE
+	t.position = Vector2(x, y)
+	t.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
+	t.size = Vector2(w / SPRITE_SCALE, h / SPRITE_SCALE)
+	t.modulate = mod
+	t.z_index = z
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(t)
+	return t
+
+
+func _bob(s: Node2D) -> void:
+	var base: float = s.position.y
+	var t := create_tween().set_loops()
+	t.tween_property(s, "position:y", base - 2.0, 0.7).set_trans(Tween.TRANS_SINE)
+	t.tween_property(s, "position:y", base, 0.7).set_trans(Tween.TRANS_SINE)
 
 
 func _spr(parent: Node, tex: String, x: float, y: float, z: int = 5) -> Sprite2D:
