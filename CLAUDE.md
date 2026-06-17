@@ -76,8 +76,10 @@
 ## CI / 릴리스 규칙 (사용자 요구)
 - **`.github/workflows/android.yml`** — 브랜치 push마다 자동으로 두 잡 실행:
   - `build-apk`: Godot/SDK 설치 → APK 빌드 → **GitHub Releases 업로드**(태그 `apk-build-<run>`, prerelease).
-  - `deploy-web`: Web(release) export → **GitHub Pages 배포**. 공개 URL: **https://jungrok5.github.io/one-scroll-bible-game/**
-  - `workflow_dispatch`로 수동 실행도 가능. permissions: contents/pages/id-token write.
+  - `deploy-web`: Web(release) export → **`gh-pages` 브랜치 푸시**(peaceiris). 공개 URL: **https://jungrok5.github.io/one-scroll-bible-game/**
+    ⚠ `actions/deploy-pages`의 `github-pages` 환경은 **기본 브랜치(main) 전용 보호**라 feature 브랜치에선 즉시 실패 →
+    그래서 환경 없는 **gh-pages 브랜치 푸시** 방식 사용. **최초 1회** Settings→Pages→Source: `gh-pages`/(root) 설정 필요.
+  - `workflow_dispatch`로 수동 실행도 가능. permissions: contents write.
 - **푸시할 때마다 APK가 릴리스에, 웹이 Pages에 갱신돼야 함** — 워크플로 깨지면 최우선 수정. CI 로그는 MCP `actions_*`로 모니터.
 - 웹은 **GitHub Pages 제약(COOP/COEP 헤더 불가) → 반드시 `variant/thread_support=false`(싱글스레드)** 로 export.
 - 웹 빌드 검증: 로컬에서 `python3 -m http.server` + Playwright Chromium(`/opt/pw-browsers`, `--enable-unsafe-swiftshader`)으로 부팅·렌더 스크린샷 확인(`docs/screenshots/web_*`).
