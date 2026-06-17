@@ -283,7 +283,7 @@ func _start_reveal(idx: int) -> void:
 	await get_tree().create_timer(1.6).timeout
 	shake(8.0)
 	_flash(Color(1, 1, 1, 0.5))
-	dialogue.start(lines, Callable(self, "_reveal_done"))
+	dialogue.start(lines, Callable(self, "_reveal_done"), "res://assets/face/guide.png")
 
 
 func _reveal_done() -> void:

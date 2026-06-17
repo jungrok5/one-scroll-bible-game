@@ -1,8 +1,7 @@
 class_name DialogueBox
 extends Control
 #
-# 말풍선 대화창(화면 하단 고정). start(lines, on_done) → 탭으로 한 줄씩 진행.
-# 모바일 가독성: 큰 볼드 글씨 · 넉넉한 패딩 · 넓은 탭 영역.
+# 하단 대화창 — Ninja Adventure 크림 9-slice + 화자 초상(faceset). 타자기 효과.
 
 signal finished
 
@@ -14,11 +13,14 @@ var _i: int = 0
 var _on_done: Callable = Callable()
 var _typing: bool = false
 var _tw: Tween = null
+var _face_path: String = ""
 
-var _panel: Panel
+var _np: NinePatchRect
 var _name: Label
 var _text: Label
 var _hint: Label
+var _facebox: NinePatchRect
+var _face: TextureRect
 
 
 func _ready() -> void:
@@ -26,45 +28,67 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 
-	_panel = Panel.new()
-	_panel.position = Vector2(12, VH - 212)
-	_panel.size = Vector2(VW - 24, 188)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.09, 0.11, 0.17, 0.96)
-	sb.border_color = Color(1, 1, 1, 0.16)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	sb.set_content_margin_all(16)
-	_panel.add_theme_stylebox_override("panel", sb)
-	add_child(_panel)
+	_np = NinePatchRect.new()
+	_np.texture = load("res://assets/ui/bubble.png")
+	for m in ["left", "right", "top", "bottom"]:
+		_np.set("patch_margin_" + m, 16)
+	_np.position = Vector2(10, VH - 178)
+	_np.size = Vector2(VW - 20, 162)
+	add_child(_np)
+
+	_facebox = NinePatchRect.new()
+	_facebox.texture = load("res://assets/ui/faceset_box.png")
+	for m in ["left", "right", "top", "bottom"]:
+		_facebox.set("patch_margin_" + m, 6)
+	_facebox.position = Vector2(14, 30)
+	_facebox.size = Vector2(64, 64)
+	_np.add_child(_facebox)
+	_face = TextureRect.new()
+	_face.position = Vector2(7, 7)
+	_face.size = Vector2(50, 50)
+	_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_facebox.add_child(_face)
 
 	_name = Label.new()
-	_name.position = Vector2(16, 12)
-	_name.add_theme_color_override("font_color", Color(1.0, 0.82, 0.40))
-	_name.add_theme_font_size_override("font_size", 19)
-	_panel.add_child(_name)
+	_name.position = Vector2(90, 12)
+	_name.add_theme_color_override("font_color", Color(0.55, 0.30, 0.12))
+	_name.add_theme_font_size_override("font_size", 17)
+	_np.add_child(_name)
 
 	_text = Label.new()
-	_text.position = Vector2(16, 44)
-	_text.size = Vector2(VW - 24 - 32, 110)
+	_text.position = Vector2(90, 40)
+	_text.size = Vector2(VW - 20 - 104, 96)
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_text.add_theme_color_override("font_color", Color(0.97, 0.97, 0.99))
-	_text.add_theme_font_size_override("font_size", 21)
-	_text.add_theme_constant_override("line_spacing", 6)
-	_panel.add_child(_text)
+	_text.add_theme_color_override("font_color", Color(0.20, 0.14, 0.10))
+	_text.add_theme_font_size_override("font_size", 19)
+	_text.add_theme_constant_override("line_spacing", 5)
+	_np.add_child(_text)
 
 	_hint = Label.new()
 	_hint.text = "탭하여 계속"
-	_hint.position = Vector2(VW - 24 - 130, 188 - 30)
-	_hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.45))
-	_hint.add_theme_font_size_override("font_size", 14)
-	_panel.add_child(_hint)
+	_hint.position = Vector2(VW - 20 - 116, 162 - 26)
+	_hint.add_theme_color_override("font_color", Color(0.45, 0.32, 0.2))
+	_hint.add_theme_font_size_override("font_size", 13)
+	_np.add_child(_hint)
 
 
-func start(lines: Array, on_done: Callable = Callable()) -> void:
+func start(lines: Array, on_done: Callable = Callable(), face_path: String = "") -> void:
 	_lines = lines
 	_i = 0
 	_on_done = on_done
+	_face_path = face_path
+	if face_path != "" and ResourceLoader.exists(face_path):
+		_face.texture = load(face_path)
+		_facebox.visible = true
+		_name.position.x = 90
+		_text.position.x = 90
+		_text.size.x = VW - 20 - 104
+	else:
+		_facebox.visible = false
+		_name.position.x = 18
+		_text.position.x = 18
+		_text.size.x = VW - 20 - 32
 	visible = true
 	_show_current()
 
@@ -82,7 +106,6 @@ func _show_current() -> void:
 	_name.visible = spk != ""
 	var body: String = e.get("text", "")
 	_text.text = body
-	# 타자기 효과
 	if _tw != null and _tw.is_valid():
 		_tw.kill()
 	_text.visible_ratio = 0.0
@@ -97,7 +120,6 @@ func _show_current() -> void:
 	)
 
 
-# 한 줄 진행(탭/E2E). 타이핑 중이면 먼저 완성, 아니면 다음 줄.
 func advance() -> void:
 	if _typing:
 		if _tw != null and _tw.is_valid():
