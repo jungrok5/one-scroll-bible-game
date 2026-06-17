@@ -169,7 +169,7 @@ func _build_ui() -> void:
 		hud_dots.append(d)
 
 	hint_label = Label.new()
-	hint_label.text = "↑ 위로 항해하세요"
+	hint_label.text = "위로 항해하세요"
 	hint_label.position = Vector2(0, 54)
 	hint_label.size = Vector2(VW, 26)
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

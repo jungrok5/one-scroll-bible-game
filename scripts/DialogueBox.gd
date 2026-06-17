@@ -52,7 +52,7 @@ func _ready() -> void:
 	_panel.add_child(_text)
 
 	_hint = Label.new()
-	_hint.text = "탭하여 계속 ▸"
+	_hint.text = "탭하여 계속"
 	_hint.position = Vector2(VW - 24 - 130, 188 - 30)
 	_hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.45))
 	_hint.add_theme_font_size_override("font_size", 14)

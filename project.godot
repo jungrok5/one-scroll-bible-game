@@ -20,6 +20,10 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 window/handheld/orientation="portrait"
 
+[gui]
+
+theme/custom_font="res://assets/fonts/NotoSansKR-Bold.woff2"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
