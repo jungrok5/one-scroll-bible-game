@@ -1,0 +1,29 @@
+; Engine configuration file.
+; Godot 4.x  —  한눈에 보는 성경 이야기: 항해 (Bible in One Scroll — The Voyage)
+; 모바일 세로 · 픽셀(nearest) · GL Compatibility(웹 호환)
+
+config_version=5
+
+[application]
+
+config/name="한눈에 보는 성경 이야기 — 항해"
+config/description="창조에서 회복까지, 구속사를 항해로 걷는 픽셀 게임. 마지막엔 배를 갈아타고 영접 기도로."
+run/main_scene="res://scenes/Main.tscn"
+config/features=PackedStringArray("4.6", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=360
+window/size/viewport_height=640
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+window/handheld/orientation="portrait"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/canvas_textures/default_texture_filter=0
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.07, 0.1, 0.2, 1)

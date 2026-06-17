@@ -1,0 +1,12 @@
+# Godot 4
+.godot/
+# build outputs
+/build/
+/exports/
+*.apk
+*.aab
+# Android gradle build template (installed by CI / locally; not committed)
+/android/
+# misc
+*.tmp
+.DS_Store
