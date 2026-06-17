@@ -95,9 +95,8 @@ func _build_world() -> void:
 	var start_y: float = ports[0]["y"] + FIRST
 	world_height = start_y + 240.0
 
-	# 기본 바다(전체, 타일) + 중앙 부두(흙길 타일)
-	_tile(world, 0, 0, VW, world_height, "tile_water.png", Color(0.82, 0.96, 1.06), -3)
-	_tile(world, PATH_X, 0, PATH_W, world_height, "tile_dirt.png", Color(0.92, 0.8, 0.6), 1)
+	# 실제 항구/바다처럼 — NA 타일셋을 조합한 타일맵(바다 변주 + 섬+모래 해안 + 나무 부두)
+	_build_tilemap()
 
 	for i in n:
 		_build_island(i)
@@ -132,13 +131,7 @@ func _build_island(i: int) -> void:
 	var py: float = ports[i]["y"]
 	var b: Dictionary = data["biome"]
 
-	# 바이옴 바다 띠(섬 주변) → 땅(타일) → 가장자리
-	_tile(world, 0, py - ISLAND_H - 110, VW, ISLAND_H * 2.0 + 220, "tile_water.png", b["sea_tint"], -2)
-	_tile(world, 0, py - ISLAND_H, VW, ISLAND_H * 2.0, b["ground_tile"], b["ground_tint"], 0)
-	_rect(world, 0, py - ISLAND_H, VW, 10, b["edge"], 0)
-	_rect(world, 0, py + ISLAND_H - 10, VW, 10, b["edge"], 0)
-	# 섬 구간 흙길
-	_tile(world, PATH_X, py - ISLAND_H, PATH_W, ISLAND_H * 2.0, "tile_dirt.png", Color(0.92, 0.8, 0.6), 1)
+	# 땅/바다/해안은 _build_tilemap()가 타일맵으로 한 번에 구성 → 여기선 소품·NPC만.
 
 	# 소품
 	for d in b["decor"]:
@@ -157,6 +150,87 @@ func _build_island(i: int) -> void:
 		world.add_child(bub)
 		bub.set_text(npc["text"])
 		npc_entries.append({"bubble": bub, "pos": Vector2(nx, ny)})
+
+
+# ---------- tilemap (실제 항구/바다 배치) ----------
+const CELL := 32.0   # 월드 px / 셀 (16px 타일 × SPRITE_SCALE)
+
+# NA 타일셋(assets/sprites/tileset.png, 16px) 아틀라스 좌표(열,행). 변주는 가중 배열.
+var _tiles := {
+	"sea":   [Vector2i(23, 7), Vector2i(23, 7), Vector2i(22, 7), Vector2i(22, 9), Vector2i(23, 6), Vector2i(23, 9)],
+	"sand":  [Vector2i(21, 13), Vector2i(20, 13), Vector2i(22, 13)],
+	"grass": [Vector2i(22, 11), Vector2i(22, 11), Vector2i(23, 11), Vector2i(24, 11)],
+	"stone": [Vector2i(26, 11), Vector2i(26, 11), Vector2i(27, 11)],
+	"wood":  [Vector2i(25, 8), Vector2i(24, 8)],
+	"dirt":  [Vector2i(21, 16)],
+}
+
+
+func _build_tilemap() -> void:
+	var ts := TileSet.new()
+	ts.tile_size = Vector2i(16, 16)
+	var src := TileSetAtlasSource.new()
+	src.texture = load("res://assets/sprites/tileset.png")
+	src.texture_region_size = Vector2i(16, 16)
+	var seen := {}
+	for cat in _tiles:
+		for c in _tiles[cat]:
+			if not seen.has(c):
+				seen[c] = true
+				src.create_tile(c)
+	ts.add_source(src, 0)
+
+	var layer := TileMapLayer.new()
+	layer.tile_set = ts
+	layer.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
+	layer.z_index = -3
+	layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	world.add_child(layer)
+
+	var cols := int(ceil(VW / CELL)) + 1
+	var rows := int(ceil(world_height / CELL)) + 1
+	for cy in rows:
+		for cx in cols:
+			var wx := float(cx) * CELL + CELL * 0.5
+			var wy := float(cy) * CELL + CELL * 0.5
+			var cat: String = _terrain_at(wx, wy)
+			var arr: Array = _tiles[cat]
+			var ac: Vector2i = arr[randi() % arr.size()]
+			layer.set_cell(Vector2i(cx, cy), 0, ac)
+
+
+# 셀의 지형 분류 — 섬은 노이즈로 들쭉날쭉한 해안선(직선 X), 중앙은 부두/길.
+func _terrain_at(wx: float, wy: float) -> String:
+	var on_path: bool = wx >= PATH_X and wx <= PATH_X + PATH_W
+	var best_d := 9999.0
+	var best_stone := false
+	for p in ports:
+		var dy: float = wy - float(p["y"])
+		if absf(dy) > ISLAND_H + CELL * 4.0:
+			continue
+		var dx: float = wx - VW * 0.5
+		var hw: float = VW * 0.5 - 12.0
+		var hh: float = ISLAND_H + 8.0
+		var d: float = sqrt((dx / hw) * (dx / hw) + (dy / hh) * (dy / hh))
+		if d < best_d:
+			best_d = d
+			best_stone = String(p["data"].get("key", "")) == "jesus"
+	var n: float = _noise(wx, wy) * 0.12
+	var is_interior: bool = best_d < 0.82 + n
+	var is_beach: bool = best_d < 0.99 + n
+	if on_path:
+		return ("stone" if best_stone else "dirt") if is_interior else "wood"
+	if is_interior:
+		return "stone" if best_stone else "grass"
+	if is_beach:
+		return "sand"
+	return "sea"
+
+
+# 결정적 해시 노이즈 [-1,1] — 셀마다 안정적인 해안 흔들림.
+func _noise(x: float, y: float) -> float:
+	var s: float = sin(x * 12.9898 + y * 78.233) * 43758.5453
+	return (s - floor(s)) * 2.0 - 1.0
 
 
 func x_bounds(y: float) -> Vector2:
