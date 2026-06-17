@@ -22,4 +22,6 @@ tile_water, tile_plank, tile_sand, sparkle = `tools/gen_assets.py`(순수 파이
 - serpent←monster21. UI: assets/ui/bubble.png(말풍선/대화창 9-slice), faceset_box.png, panel.png.
 - 초상(faceset): assets/face/guide.png(char9), player.png(char25).
 - 미러: github.com/sparklinlabs/superpowers-asset-packs/ninja-adventure
-- 남은 혼용(추후 NA로 통일 가능): 바닥/물 타일(Kenney Tiny), 배·십자가·기둥(자체 제작).
+- **배경 타일셋**: `tileset.png`(땅·소품, NA background-elements), `tileset_water.png`(물 오토타일 =
+  공식 게임레포 github.com/pixel-boy/NinjaAdventure `content/map/tileset_floor.png`의 물 블롭).
+- 남은 혼용(추후 NA로 통일 가능): 배·십자가·기둥(자체 제작).

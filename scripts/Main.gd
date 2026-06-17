@@ -155,9 +155,8 @@ func _build_island(i: int) -> void:
 # ---------- tilemap (실제 항구/바다 배치) ----------
 const CELL := 32.0   # 월드 px / 셀 (16px 타일 × SPRITE_SCALE)
 
-# NA 타일셋(assets/sprites/tileset.png, 16px) 아틀라스 좌표(열,행). 변주는 가중 배열.
+# 땅 타일(condensed tileset.png, 16px) 아틀라스 좌표(열,행). 변주는 가중 배열.
 var _tiles := {
-	"sea":   [Vector2i(23, 7), Vector2i(23, 7), Vector2i(22, 7), Vector2i(22, 9), Vector2i(23, 6), Vector2i(23, 9)],
 	"sand":  [Vector2i(21, 13), Vector2i(20, 13), Vector2i(22, 13)],
 	"grass": [Vector2i(22, 11), Vector2i(22, 11), Vector2i(23, 11), Vector2i(24, 11)],
 	"stone": [Vector2i(26, 11), Vector2i(26, 11), Vector2i(27, 11)],
@@ -166,42 +165,133 @@ var _tiles := {
 }
 
 
+func _new_layer(z: int) -> TileMapLayer:
+	var l := TileMapLayer.new()
+	l.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
+	l.z_index = z
+	l.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	world.add_child(l)
+	return l
+
+
+# 바다는 Godot 지형 오토타일(set_cells_terrain_connect)로 — 해안 거품/안쪽모서리 자동 선택.
+# 공식 NA 물 타일셋(tileset_water.png)에서 픽셀로 peering bit 자동 추출.
 func _build_tilemap() -> void:
-	var ts := TileSet.new()
-	ts.tile_size = Vector2i(16, 16)
-	var src := TileSetAtlasSource.new()
-	src.texture = load("res://assets/sprites/tileset.png")
-	src.texture_region_size = Vector2i(16, 16)
+	# 1) 땅 레이어 (잔디/모래/돌/흙길) — 단순 채움.
+	var gts := TileSet.new()
+	gts.tile_size = Vector2i(16, 16)
+	var gsrc := TileSetAtlasSource.new()
+	gsrc.texture = load("res://assets/sprites/tileset.png")
+	gsrc.texture_region_size = Vector2i(16, 16)
 	var seen := {}
 	for cat in _tiles:
 		for c in _tiles[cat]:
 			if not seen.has(c):
 				seen[c] = true
-				src.create_tile(c)
-	ts.add_source(src, 0)
+				gsrc.create_tile(c)
+	gts.add_source(gsrc, 0)
+	var ground := _new_layer(-3)
+	ground.tile_set = gts
 
-	var layer := TileMapLayer.new()
-	layer.tile_set = ts
-	layer.scale = Vector2(SPRITE_SCALE, SPRITE_SCALE)
-	layer.z_index = -3
-	layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	world.add_child(layer)
+	# 2) 물 레이어 (지형 오토타일) — 거품 해안.
+	var wtex: Texture2D = load("res://assets/sprites/tileset_water.png")
+	var wimg := wtex.get_image()
+	if wimg.is_compressed():
+		wimg.decompress()
+	var wts := TileSet.new()
+	wts.tile_size = Vector2i(16, 16)
+	var wsrc := TileSetAtlasSource.new()
+	wsrc.texture = wtex
+	wsrc.texture_region_size = Vector2i(16, 16)
+	wts.add_source(wsrc, 0)
+	wts.add_terrain_set()
+	var tset := 0
+	wts.set_terrain_set_mode(tset, TileSet.TERRAIN_MODE_MATCH_CORNERS_AND_SIDES)
+	wts.add_terrain(tset)
+	wts.set_terrain_name(tset, 0, "water")
+	wts.set_terrain_color(tset, 0, Color(0.4, 0.7, 1.0))
+	# NA 물 블롭(cols 0..11, rows 21..25): 중앙이 물인 칸만 타일화하고 8방향 peering 자동설정.
+	var dirs := {
+		TileSet.CELL_NEIGHBOR_RIGHT_SIDE: Vector2i(14, 8),
+		TileSet.CELL_NEIGHBOR_LEFT_SIDE: Vector2i(1, 8),
+		TileSet.CELL_NEIGHBOR_TOP_SIDE: Vector2i(8, 1),
+		TileSet.CELL_NEIGHBOR_BOTTOM_SIDE: Vector2i(8, 14),
+		TileSet.CELL_NEIGHBOR_TOP_RIGHT_CORNER: Vector2i(13, 3),
+		TileSet.CELL_NEIGHBOR_TOP_LEFT_CORNER: Vector2i(3, 3),
+		TileSet.CELL_NEIGHBOR_BOTTOM_RIGHT_CORNER: Vector2i(13, 13),
+		TileSet.CELL_NEIGHBOR_BOTTOM_LEFT_CORNER: Vector2i(3, 13),
+	}
+	for ry in range(21, 26):
+		for cx in range(0, 12):
+			var origin := Vector2i(cx * 16, ry * 16)
+			if not _is_water_px(wimg, origin + Vector2i(8, 8)):
+				continue
+			var ac := Vector2i(cx, ry)
+			wsrc.create_tile(ac)
+			var td := wsrc.get_tile_data(ac, 0)
+			td.terrain_set = tset
+			td.terrain = 0
+			for nb in dirs:
+				if _is_water_px(wimg, origin + dirs[nb]):
+					td.set_terrain_peering_bit(nb, 0)
+	var water := _new_layer(-2)
+	water.tile_set = wts
 
+	# 3) 부두 레이어 (바다 위 중앙 나무 다리).
+	var pts := TileSet.new()
+	pts.tile_size = Vector2i(16, 16)
+	var psrc := TileSetAtlasSource.new()
+	psrc.texture = load("res://assets/sprites/tileset.png")
+	psrc.texture_region_size = Vector2i(16, 16)
+	for c in _tiles["wood"]:
+		psrc.create_tile(c)
+	pts.add_source(psrc, 0)
+	var pier := _new_layer(-1)
+	pier.tile_set = pts
+
+	# 채움 루프 (가장자리 1칸 여유 → 화면 끝 거품 방지).
 	var cols := int(ceil(VW / CELL)) + 1
 	var rows := int(ceil(world_height / CELL)) + 1
-	for cy in rows:
-		for cx in cols:
+	var sea_cells: Array[Vector2i] = []
+	for cy in range(-1, rows + 1):
+		for cx in range(-1, cols + 1):
 			var wx := float(cx) * CELL + CELL * 0.5
 			var wy := float(cy) * CELL + CELL * 0.5
-			var cat: String = _terrain_at(wx, wy)
-			var arr: Array = _tiles[cat]
-			var ac: Vector2i = arr[randi() % arr.size()]
-			layer.set_cell(Vector2i(cx, cy), 0, ac)
+			var info := _land_at(wx, wy)
+			var on_path: bool = wx >= PATH_X and wx <= PATH_X + PATH_W
+			var cell := Vector2i(cx, cy)
+			var in_view: bool = cx >= 0 and cx < cols and cy >= 0 and cy < rows
+			# 땅 (섬=잔디/돌, 길=흙, 바다 밑은 모래[물에 가려 안 보임])
+			var is_land: bool = info["interior"] or info["beach"]
+			if in_view:
+				var gcat := "sand"
+				if is_land:
+					if info["stone"]:
+						gcat = "stone"
+					elif on_path:
+						gcat = "dirt"
+					else:
+						gcat = "grass"
+				var garr: Array = _tiles[gcat]
+				ground.set_cell(cell, 0, garr[randi() % garr.size()])
+			# 바다
+			if not is_land:
+				sea_cells.append(cell)
+				if on_path and in_view:
+					var warr: Array = _tiles["wood"]
+					pier.set_cell(cell, 0, warr[randi() % warr.size()])
+	water.set_cells_terrain_connect(sea_cells, tset, 0, false)
 
 
-# 셀의 지형 분류 — 섬은 노이즈로 들쭉날쭉한 해안선(직선 X), 중앙은 부두/길.
-func _terrain_at(wx: float, wy: float) -> String:
-	var on_path: bool = wx >= PATH_X and wx <= PATH_X + PATH_W
+func _is_water_px(img: Image, p: Vector2i) -> bool:
+	if p.x < 0 or p.y < 0 or p.x >= img.get_width() or p.y >= img.get_height():
+		return false
+	var c := img.get_pixelv(p)
+	return c.a > 0.5 and (c.b - c.r) > 0.06 and c.b > 0.55
+
+
+# 셀의 땅 분류 — 섬은 노이즈로 들쭉날쭉한 해안선(직선 X).
+func _land_at(wx: float, wy: float) -> Dictionary:
 	var best_d := 9999.0
 	var best_stone := false
 	for p in ports:
@@ -216,15 +306,7 @@ func _terrain_at(wx: float, wy: float) -> String:
 			best_d = d
 			best_stone = String(p["data"].get("key", "")) == "jesus"
 	var n: float = _noise(wx, wy) * 0.12
-	var is_interior: bool = best_d < 0.82 + n
-	var is_beach: bool = best_d < 0.99 + n
-	if on_path:
-		return ("stone" if best_stone else "dirt") if is_interior else "wood"
-	if is_interior:
-		return "stone" if best_stone else "grass"
-	if is_beach:
-		return "sand"
-	return "sea"
+	return {"interior": best_d < 0.82 + n, "beach": best_d < 1.0 + n, "stone": best_stone}
 
 
 # 결정적 해시 노이즈 [-1,1] — 셀마다 안정적인 해안 흔들림.
