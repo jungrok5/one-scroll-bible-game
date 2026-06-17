@@ -155,14 +155,34 @@ func _build_island(i: int) -> void:
 # ---------- tilemap (실제 항구/바다 배치) ----------
 const CELL := 32.0   # 월드 px / 셀 (16px 타일 × SPRITE_SCALE)
 
-# 땅 타일(condensed tileset.png, 16px) 아틀라스 좌표(열,행). 변주는 가중 배열.
-var _tiles := {
-	"sand":  [Vector2i(21, 13), Vector2i(20, 13), Vector2i(22, 13)],
-	"grass": [Vector2i(22, 11), Vector2i(22, 11), Vector2i(23, 11), Vector2i(24, 11)],
-	"stone": [Vector2i(26, 11), Vector2i(26, 11), Vector2i(27, 11)],
-	"wood":  [Vector2i(25, 8), Vector2i(24, 8)],
-	"dirt":  [Vector2i(21, 16)],
-}
+# 돌(예수님 광장)·나무 부두 = condensed tileset.png 아틀라스 좌표. 변주는 가중 배열.
+const STONE := [Vector2i(26, 11), Vector2i(26, 11), Vector2i(27, 11)]
+const WOOD := [Vector2i(25, 8), Vector2i(24, 8)]
+
+# 잔디(0)↔흙(1) 지형 오토타일 — 공식 NA tileset_floor.png(=tileset_water.png) + .tres의
+# 아티스트 peering bit 그대로. [열,행, 자기지형, R,BR,B,BL,L,TL,T,TR] (지형idx 또는 -1=미설정).
+const GRASS_DIRT := [
+	[0,7,1,1,1,1,0,0,0,0,0], [0,8,1,1,1,1,0,0,0,1,1], [0,9,1,1,0,0,0,0,0,1,1], [0,10,1,1,0,0,0,0,0,0,0],
+	[0,11,1,1,1,1,1,1,1,1,1], [0,12,0,0,0,0,0,0,0,0,0], [1,7,1,1,1,1,1,1,0,0,0], [1,8,1,1,1,1,1,1,1,1,1],
+	[1,9,1,1,0,0,0,1,1,1,1], [1,10,1,1,0,0,0,1,0,0,0], [1,11,1,1,1,1,1,1,1,1,1], [1,12,0,0,0,0,0,0,0,0,0],
+	[2,7,1,0,0,1,1,1,0,0,0], [2,8,1,0,0,1,1,1,1,1,0], [2,9,1,0,0,0,0,1,1,1,0], [2,10,1,0,0,0,0,1,0,0,0],
+	[2,11,0,0,0,0,0,0,0,0,0], [2,12,0,0,0,0,0,0,0,0,0], [3,7,1,0,0,1,0,0,0,0,0], [3,8,1,0,0,1,0,0,0,1,0],
+	[3,9,1,0,0,0,0,0,0,1,0], [3,10,1,0,0,0,0,0,0,0,0], [3,11,0,0,0,0,0,0,0,0,0], [3,12,0,0,0,0,0,0,0,0,0],
+	[4,7,1,1,0,1,0,0,0,0,0], [4,8,1,1,0,1,0,0,0,1,1], [4,9,1,1,1,1,0,0,0,1,0], [4,10,1,1,0,0,0,0,0,1,0],
+	[4,11,1,1,0,1,0,0,0,1,0], [4,12,0,0,0,0,0,0,0,0,0], [5,7,1,1,0,1,1,1,0,0,0], [5,8,1,1,0,1,1,1,1,1,1],
+	[5,9,1,1,1,1,1,1,1,1,0], [5,10,1,1,0,0,0,1,1,1,0], [5,11,1,1,0,1,1,1,1,1,0], [6,7,1,1,1,1,0,1,0,0,0],
+	[6,8,1,1,1,1,0,1,1,1,1], [6,9,1,1,1,1,1,1,0,1,1], [6,10,1,1,0,0,0,1,0,1,1], [6,11,1,1,1,1,0,1,0,1,1],
+	[7,7,1,0,0,1,0,1,0,0,0], [7,8,1,0,0,1,0,1,1,1,0], [7,9,1,0,0,1,1,1,0,1,0], [7,10,1,0,0,0,0,1,0,1,0],
+	[7,11,1,0,0,1,0,1,0,1,0], [8,7,1,1,0,1,0,1,0,0,0], [8,8,1,1,0,1,0,1,1,1,1], [8,9,1,1,1,1,1,1,0,1,0],
+	[8,10,1,1,0,0,0,1,0,1,0], [8,11,1,1,0,1,0,1,0,1,0], [9,7,1,1,1,1,0,1,1,1,0], [9,8,1,1,0,1,1,1,0,1,1],
+	[9,9,1,1,1,1,0,1,0,1,0], [9,10,1,1,0,1,0,1,0,1,1], [10,9,1,1,0,1,1,1,0,1,0], [10,10,1,1,0,1,0,1,1,1,0],
+]
+const _NB8 := [
+	TileSet.CELL_NEIGHBOR_RIGHT_SIDE, TileSet.CELL_NEIGHBOR_BOTTOM_RIGHT_CORNER,
+	TileSet.CELL_NEIGHBOR_BOTTOM_SIDE, TileSet.CELL_NEIGHBOR_BOTTOM_LEFT_CORNER,
+	TileSet.CELL_NEIGHBOR_LEFT_SIDE, TileSet.CELL_NEIGHBOR_TOP_LEFT_CORNER,
+	TileSet.CELL_NEIGHBOR_TOP_SIDE, TileSet.CELL_NEIGHBOR_TOP_RIGHT_CORNER,
+]
 
 
 func _new_layer(z: int) -> TileMapLayer:
@@ -177,19 +197,39 @@ func _new_layer(z: int) -> TileMapLayer:
 # 바다는 Godot 지형 오토타일(set_cells_terrain_connect)로 — 해안 거품/안쪽모서리 자동 선택.
 # 공식 NA 물 타일셋(tileset_water.png)에서 픽셀로 peering bit 자동 추출.
 func _build_tilemap() -> void:
-	# 1) 땅 레이어 (잔디/모래/돌/흙길) — 단순 채움.
+	# 1) 땅 레이어 — 잔디(0)↔흙(1) 지형 오토타일(source 0=floor) + 돌 단순채움(source 1=condensed).
 	var gts := TileSet.new()
 	gts.tile_size = Vector2i(16, 16)
 	var gsrc := TileSetAtlasSource.new()
-	gsrc.texture = load("res://assets/sprites/tileset.png")
+	gsrc.texture = load("res://assets/sprites/tileset_water.png")
 	gsrc.texture_region_size = Vector2i(16, 16)
-	var seen := {}
-	for cat in _tiles:
-		for c in _tiles[cat]:
-			if not seen.has(c):
-				seen[c] = true
-				gsrc.create_tile(c)
 	gts.add_source(gsrc, 0)
+	var ssrc := TileSetAtlasSource.new()
+	ssrc.texture = load("res://assets/sprites/tileset.png")
+	ssrc.texture_region_size = Vector2i(16, 16)
+	for c in STONE:
+		if not ssrc.has_tile(c):
+			ssrc.create_tile(c)
+	gts.add_source(ssrc, 1)
+	gts.add_terrain_set()
+	var gset := 0
+	gts.set_terrain_set_mode(gset, TileSet.TERRAIN_MODE_MATCH_CORNERS_AND_SIDES)
+	gts.add_terrain(gset)
+	gts.set_terrain_name(gset, 0, "grass")
+	gts.set_terrain_color(gset, 0, Color(0.45, 0.75, 0.2))
+	gts.add_terrain(gset)
+	gts.set_terrain_name(gset, 1, "dirt")
+	gts.set_terrain_color(gset, 1, Color(0.6, 0.4, 0.25))
+	for t in GRASS_DIRT:
+		var ac := Vector2i(t[0], t[1])
+		gsrc.create_tile(ac)
+		var gd := gsrc.get_tile_data(ac, 0)
+		gd.terrain_set = gset
+		gd.terrain = t[2]
+		for i in 8:
+			var v: int = t[3 + i]
+			if v >= 0:
+				gd.set_terrain_peering_bit(_NB8[i], v)
 	var ground := _new_layer(-3)
 	ground.tile_set = gts
 
@@ -243,16 +283,18 @@ func _build_tilemap() -> void:
 	var psrc := TileSetAtlasSource.new()
 	psrc.texture = load("res://assets/sprites/tileset.png")
 	psrc.texture_region_size = Vector2i(16, 16)
-	for c in _tiles["wood"]:
+	for c in WOOD:
 		psrc.create_tile(c)
 	pts.add_source(psrc, 0)
 	var pier := _new_layer(-1)
 	pier.tile_set = pts
 
-	# 채움 루프 (가장자리 1칸 여유 → 화면 끝 거품 방지).
+	# 채움 루프 (가장자리 1칸 여유 → 화면 끝 전이 끊김 방지).
 	var cols := int(ceil(VW / CELL)) + 1
 	var rows := int(ceil(world_height / CELL)) + 1
 	var sea_cells: Array[Vector2i] = []
+	var grass_cells: Array[Vector2i] = []
+	var dirt_cells: Array[Vector2i] = []
 	for cy in range(-1, rows + 1):
 		for cx in range(-1, cols + 1):
 			var wx := float(cx) * CELL + CELL * 0.5
@@ -261,25 +303,22 @@ func _build_tilemap() -> void:
 			var on_path: bool = wx >= PATH_X and wx <= PATH_X + PATH_W
 			var cell := Vector2i(cx, cy)
 			var in_view: bool = cx >= 0 and cx < cols and cy >= 0 and cy < rows
-			# 땅 (섬=잔디/돌, 길=흙, 바다 밑은 모래[물에 가려 안 보임])
 			var is_land: bool = info["interior"] or info["beach"]
-			if in_view:
-				var gcat := "sand"
-				if is_land:
-					if info["stone"]:
-						gcat = "stone"
-					elif on_path:
-						gcat = "dirt"
-					else:
-						gcat = "grass"
-				var garr: Array = _tiles[gcat]
-				ground.set_cell(cell, 0, garr[randi() % garr.size()])
-			# 바다
-			if not is_land:
+			# 땅: 예수님 섬=돌(단순), 그 외 섬=잔디(길은 흙) 오토타일.
+			if is_land:
+				if info["stone"]:
+					ground.set_cell(cell, 1, STONE[randi() % STONE.size()])
+				elif on_path:
+					dirt_cells.append(cell)
+				else:
+					grass_cells.append(cell)
+			# 바다 + 부두
+			else:
 				sea_cells.append(cell)
 				if on_path and in_view:
-					var warr: Array = _tiles["wood"]
-					pier.set_cell(cell, 0, warr[randi() % warr.size()])
+					pier.set_cell(cell, 0, WOOD[randi() % WOOD.size()])
+	ground.set_cells_terrain_connect(grass_cells, gset, 0)
+	ground.set_cells_terrain_connect(dirt_cells, gset, 1)
 	water.set_cells_terrain_connect(sea_cells, tset, 0, false)
 
 

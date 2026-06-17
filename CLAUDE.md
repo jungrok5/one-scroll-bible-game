@@ -96,18 +96,21 @@
 **전이(transition) 타일**(거품 해안·둥근 모서리·안쪽모서리)을 써야 나옴 → Godot **지형 오토타일** 사용.
 - `Main.gd::_build_tilemap()` — 3개 TileMapLayer(셀 32px=16×scale2, nearest):
   1. **땅**(z=-3, `tileset.png`): 잔디[(22,11)(23,11)(24,11)]·돌[(26,11)(27,11)]·흙길[(21,16)]·모래[(21,13)…] 단순 채움.
+  - 땅 source0=`tileset_water.png`(잔디0↔흙1 **2지형** 오토타일, 길이 자연스러운 곡선), source1=condensed(돌 단순).
   2. **물**(z=-2, `tileset_water.png`): **`set_cells_terrain_connect()`** 지형 오토타일.
      공식 NA `tileset_floor.png` 물 블롭(cols0~11,rows21~25) 사용. peering bit은 **픽셀에서 자동 추출**
-     (`_is_water_px`: 파란물 b-r>0.06) — 8방향 샘플점이 물이면 그 방향 bit=물. → 거품 해안 자동.
-  3. **부두**(z=-1): 바다 위 중앙 길 구간에 나무판[(25,8)(24,8)].
+     (`_is_water_px`: 파란물 b-r>0.06) — 8방향 샘플점이 물이면 그 방향 bit=물. → 거품 해안 자동. (ignore_empty=false)
+  3. **부두**(z=-1): 바다 위 중앙 길 구간에 나무판(`WOOD`).
+- **잔디↔흙 peering bit**은 공식 `tileset.tres`(레포 NinjaAdventure)의 아티스트값 그대로 `GRASS_DIRT` 상수에 박음
+  (terrain0=초록=잔디, terrain1=갈색=흙; 픽셀 추출보다 정확). 잔디/흙 connect는 ignore_empty=true(바다=비움 무시).
 - `_land_at()`: 항구별 타원거리 + `_noise()`(sin 해시) → **유기적 해안선**(직선 X).
-  섬(interior+beach)=잔디(예수님=돌), 길=흙, 그 밖=바다. 바다 밑 모래는 물에 가려 안 보임.
-- ⚠ condensed `tileset.png`의 (18,11)/(19,11)은 **테두리 포장타일**(모래로 쓰면 네모 박스). 모래는 (21,13) 사용.
+  섬(interior+beach)=잔디(예수님=돌), 길=흙, 그 밖=바다.
+- ⚠ condensed `tileset.png`의 (18,11)/(19,11)은 **테두리 포장타일**(모래로 쓰면 네모 박스). 돌은 (26/27,11).
 - 타일 좌표 식별은 `/tmp/decode.py`(순수 파이썬 PNG 디코더)로 라벨 그리드 크롭 떠서 Read로 눈 확인.
   공식 팩: `curl codeload.github.com/pixel-boy/NinjaAdventure/tar.gz/refs/heads/main` (레포명 NinjaAdventure).
 
 ## 현재 상태 (2026-06-17)
 MVP 수직 슬라이스 완성: 4기항지(창조·타락·예수님[반전]·회복) + 영접 기도 + 배 갈아타기 엔딩.
-배경: **Godot 지형 오토타일로 거품 해안**(위 섹션) → 마인크래프트식 격자 탈피. E2E 확인(`docs/screenshots/`).
-APK 로컬 빌드 성공·서명 검증 완료. CI 워크플로 추가. **다음**: 13기항지 확장, 기항지별 연출 강화,
-잔디↔흙길도 오토타일, NA FX 오버레이, 다국어(i18n) 연동.
+배경: **Godot 지형 오토타일** — 물(거품 해안)·잔디↔흙길(곡선) 모두 오토타일 → 마인크래프트식 격자 완전 탈피.
+E2E 확인(`docs/screenshots/`). APK 로컬 빌드 성공·서명 검증 완료. CI 워크플로 추가.
+**다음**: 13기항지 확장, 기항지별 연출 강화, NA FX 오버레이, 배·십자가·기둥 NA화, 다국어(i18n) 연동.
