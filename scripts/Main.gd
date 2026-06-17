@@ -34,11 +34,18 @@ var hint_label: Label
 var rescue_ship: Sprite2D
 var theme_res: Theme
 
+var vignette: TextureRect
+var shard_box: Control
+var shards: Array = []
+var _dot_tex: Texture2D
+var _shake: float = 0.0
+
 
 func _ready() -> void:
 	randomize()
 	_setup_input()
 	_setup_font()
+	_dot_tex = load("res://assets/sprites/dot.png")
 	stops = GameData.stops()
 	_build_world()
 	_build_ui()
@@ -158,6 +165,21 @@ func _build_ui() -> void:
 	ui = CanvasLayer.new()
 	add_child(ui)
 
+	# 비네트(어두운 가장자리) — 부드럽게 보이도록 linear 필터
+	vignette = TextureRect.new()
+	vignette.texture = load("res://assets/sprites/vignette.png")
+	vignette.position = Vector2.ZERO
+	vignette.size = Vector2(VW, VH)
+	vignette.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vignette.modulate = Color(1, 1, 1, 0.0)
+	ui.add_child(vignette)
+
+	# 약속의 빛 조각 행(상단)
+	shard_box = Control.new()
+	shard_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(shard_box)
+
 	var n := stops.size()
 	var total_w := float(n - 1) * 22.0
 	for i in n:
@@ -195,11 +217,23 @@ func _set_hud(done: int) -> void:
 
 # ---------- game loop ----------
 func _process(_delta: float) -> void:
+	# 카메라 흔들림
+	if camera != null:
+		if _shake > 0.15:
+			camera.offset = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
+			_shake *= 0.86
+		elif camera.offset != Vector2.ZERO:
+			camera.offset = Vector2.ZERO
+
 	if in_dialogue or cur >= ports.size():
 		return
 	var p: Dictionary = ports[cur]
 	if not p["visited"] and player.position.y <= p["y"]:
 		_trigger_port(cur)
+
+
+func shake(amount: float) -> void:
+	_shake = maxf(_shake, amount)
 
 
 func _trigger_port(idx: int) -> void:
@@ -214,6 +248,9 @@ func _on_port_done() -> void:
 	ports[cur]["visited"] = true
 	_set_hud(cur + 1)
 	var data: Dictionary = ports[cur]["data"]
+	var shard: String = data.get("shard", "")
+	if shard != "":
+		_add_shard(shard)
 	if data.get("ending", false):
 		_start_ending()
 		return
@@ -226,22 +263,41 @@ func _on_port_done() -> void:
 func _play_fx(key: String, py: float) -> void:
 	match key:
 		"creation":
-			canvas_mod.color = Color(0.32, 0.36, 0.5)
+			# 어둠 → 천둥 → 빛이 있으라
+			canvas_mod.color = Color(0.18, 0.2, 0.34)
+			_vig(0.5)
 			_lightning(py)
-			await get_tree().create_timer(0.22).timeout
+			shake(9.0)
+			await get_tree().create_timer(0.25).timeout
 			_lightning(py)
-			_flash(Color(1, 1, 1, 0.85))
-			var t := create_tween()
-			t.tween_property(canvas_mod, "color", Color(1, 1, 1), 1.2)
+			shake(7.0)
+			_flash(Color(1, 1, 1, 0.8))
+			_grade(Color(1, 1, 1), 1.4)
+			_vig(0.08)
+			_rays(py, Color(1.0, 0.95, 0.7, 0.5), 2.5)
+			_weather("motes", py)
 		"fall":
-			var t2 := create_tween()
-			t2.tween_property(canvas_mod, "color", Color(0.62, 0.58, 0.6), 1.0)
+			# 샬롬이 깨짐 — 채도 빠지고 잎이 진다
+			_grade(Color(0.6, 0.55, 0.58), 1.2)
+			_vig(0.5)
+			_weather("petals", py)
 		"jesus":
-			var t3 := create_tween()
-			t3.tween_property(canvas_mod, "color", Color(0.5, 0.5, 0.62), 0.8)
+			# 최암흑 → 빛 폭발 → 빛 조각 합체(부활)
+			_grade(Color(0.3, 0.32, 0.46), 0.6)
+			_vig(0.62)
+			await get_tree().create_timer(0.8).timeout
+			_flash(Color(1, 1, 1, 0.9))
+			shake(10.0)
+			_grade(Color(1.0, 0.98, 0.92), 1.2)
+			_vig(0.12)
+			_rays(py, Color(1.0, 0.96, 0.78, 0.6), 3.0)
+			_converge_shards(Vector2(VW * 0.5, VH * 0.42))
+			_weather("motes", py)
 		"restoration":
-			var t4 := create_tween()
-			t4.tween_property(canvas_mod, "color", Color(1.0, 0.97, 0.86), 1.2)
+			_grade(Color(1.0, 0.95, 0.82), 1.4)
+			_vig(0.04)
+			_rays(py, Color(1.0, 0.9, 0.6, 0.55), 3.5)
+			_weather("motes", py)
 
 
 func _lightning(py: float) -> void:
@@ -261,6 +317,67 @@ func _flash(col: Color) -> void:
 	var t := create_tween()
 	t.tween_property(f, "modulate:a", 0.0, 0.5)
 	t.tween_callback(f.queue_free)
+
+
+func _grade(target: Color, dur: float) -> void:
+	var t := create_tween()
+	t.tween_property(canvas_mod, "color", target, dur)
+
+
+func _vig(alpha: float) -> void:
+	var t := create_tween()
+	t.tween_property(vignette, "modulate:a", alpha, 1.0)
+
+
+func _rays(py: float, color: Color, dur: float) -> void:
+	var r := LightRays.new()
+	r.position = Vector2(VW * 0.5, py - 210.0)
+	r.z_index = 8
+	r.setup(color)
+	world.add_child(r)
+	if dur > 0.0:
+		var t := create_tween()
+		t.tween_interval(dur)
+		t.tween_property(r, "modulate:a", 0.0, 1.0)
+		t.tween_callback(r.queue_free)
+
+
+func _weather(kind: String, py: float) -> void:
+	var p := Fx.particles(kind, _dot_tex, 180.0)
+	p.position = Vector2(VW * 0.5, py - 200.0)
+	p.z_index = 7
+	world.add_child(p)
+
+
+func _add_shard(label: String) -> void:
+	var s := TextureRect.new()
+	s.texture = _dot_tex
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	s.custom_minimum_size = Vector2(14, 14)
+	s.size = Vector2(14, 14)
+	s.modulate = Color(1.0, 0.85, 0.4, 0.0)
+	s.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shard_box.add_child(s)
+	shards.append(s)
+	# 상단 중앙에 한 줄로 재배치
+	var n := shards.size()
+	for i in n:
+		shards[i].position = Vector2(VW * 0.5 - float(n - 1) * 11.0 + float(i) * 22.0 - 7.0, 40.0)
+	var t := create_tween()
+	t.tween_property(s, "modulate:a", 0.95, 0.4)
+
+
+func _converge_shards(target: Vector2) -> void:
+	for s in shards:
+		var t := create_tween()
+		t.set_parallel(true)
+		t.tween_property(s, "position", target - Vector2(7, 7), 1.0).set_trans(Tween.TRANS_CUBIC)
+		t.tween_property(s, "scale", Vector2(2.2, 2.2), 1.0)
+		t.chain().tween_property(s, "modulate:a", 0.0, 0.3)
+	if shards.size() > 0:
+		var ft := create_tween()
+		ft.tween_interval(1.0)
+		ft.tween_callback(func() -> void: _flash(Color(1, 1, 1, 0.7)))
 
 
 # ---------- ending: prayer → ship swap → closing ----------
@@ -320,13 +437,19 @@ func _show_prayer() -> void:
 
 
 func _do_ship_swap() -> void:
+	# 구조선으로 건너가는 순간 일출이 터진다
+	_vig(0.0)
+	if rescue_ship != null:
+		_rays(rescue_ship.position.y + 210.0, Color(1.0, 0.92, 0.62, 0.7), 3.0)
+	shake(6.0)
+	_flash(Color(1.0, 0.95, 0.8, 0.6))
 	var t := create_tween()
 	t.set_parallel(true)
-	t.tween_property(canvas_mod, "color", Color(1.0, 0.95, 0.8), 1.5)
+	t.tween_property(canvas_mod, "color", Color(1.05, 1.0, 0.85), 1.6)
 	if rescue_ship != null:
-		t.tween_property(player, "position", rescue_ship.position + Vector2(0, 22), 1.4)
+		t.tween_property(player, "position", rescue_ship.position + Vector2(0, 22), 1.5).set_trans(Tween.TRANS_SINE)
 	t.set_parallel(false)
-	t.tween_interval(0.4)
+	t.tween_interval(0.5)
 	t.tween_callback(_show_closing)
 
 

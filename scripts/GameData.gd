@@ -16,6 +16,7 @@ static func stops() -> Array:
 			"tag": "구약 · 시작",
 			"npc": "npc_teal.png",
 			"fx": "creation",
+			"shard": "말씀",
 			"lines": [
 				{"speaker": "", "text": "하나님이 보시기에 “심히 좋은” 세상을 지으셨다."},
 				{"speaker": "뱃사람", "text": "엿새 동안 빛과 바다와 생명을 지으시고, 마지막에 사람을 하나님의 형상대로 지으셨어요."},
@@ -29,6 +30,7 @@ static func stops() -> Array:
 			"tag": "구약 · 문제의 시작",
 			"npc": "npc_red.png",
 			"fx": "fall",
+			"shard": "여자의 후손",
 			"lines": [
 				{"speaker": "", "text": "죄가 들어와 사람과 하나님 사이가 끊어졌다."},
 				{"speaker": "나그네", "text": "아담과 하와가 선악과를 먹고 에덴에서 쫓겨났습니다. 죽음과 수고가 들어왔죠…"},

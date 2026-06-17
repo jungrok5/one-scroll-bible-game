@@ -168,6 +168,21 @@ def tile_plank():
 def waterfx():  # a small foam/sparkle used for shimmer
     g=G(6,3); g.rect(0,1,5,1,(180,220,235)); g.set(1,0,(220,240,250)); g.png("sparkle.png")
 
+def dot():  # soft round particle (linear-filtered in engine)
+    g=G(8,8)
+    g.disc(4,4,3.6,(255,255,255,60)); g.disc(4,4,2.4,(255,255,255,150)); g.disc(4,4,1.2,(255,255,255,255))
+    g.png("dot.png")
+
+def vignette():  # smooth dark edges (360x640, linear-filtered in engine)
+    W,H=360,640; g=G(W,H); cx,cy=W/2.0,H/2.0; maxd=math.hypot(cx,cy)
+    for y in range(H):
+        for x in range(W):
+            d=math.hypot(x-cx,y-cy)/maxd
+            t=max(0.0,(d-0.42)/0.58)
+            a=int(210*(t*t))
+            if a>0: g.set(x,y,(0,0,0,min(255,a)))
+    g.png("vignette.png")
+
 print("generating sprites ->", OUTDIR)
 person("player.png",(70,112,172), hair=(50,40,34), hat=(40,40,46))
 person("guide.png",(206,186,146), hair=(190,190,196))
@@ -179,4 +194,5 @@ ship("ship_pirate.png",(122,74,42),(232,226,210),(30,30,36))
 ship("ship_rescue.png",(150,110,80),(248,248,250),(244,210,120),cross=True)
 sign(); cross(); serpent(); tree(); bush()
 tile_water(); tile_grass(); tile_sand(); tile_plank(); waterfx()
+dot(); vignette()
 print("done.")

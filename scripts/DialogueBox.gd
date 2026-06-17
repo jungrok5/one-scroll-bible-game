@@ -12,6 +12,8 @@ const VH := 640.0
 var _lines: Array = []
 var _i: int = 0
 var _on_done: Callable = Callable()
+var _typing: bool = false
+var _tw: Tween = null
 
 var _panel: Panel
 var _name: Label
@@ -78,11 +80,32 @@ func _show_current() -> void:
 	var spk: String = e.get("speaker", "")
 	_name.text = spk
 	_name.visible = spk != ""
-	_text.text = e.get("text", "")
+	var body: String = e.get("text", "")
+	_text.text = body
+	# 타자기 효과
+	if _tw != null and _tw.is_valid():
+		_tw.kill()
+	_text.visible_ratio = 0.0
+	_typing = true
+	_hint.visible = false
+	var dur: float = clampf(float(body.length()) * 0.035, 0.3, 2.6)
+	_tw = create_tween()
+	_tw.tween_property(_text, "visible_ratio", 1.0, dur)
+	_tw.tween_callback(func() -> void:
+		_typing = false
+		_hint.visible = true
+	)
 
 
-# 한 줄 진행(탭 또는 E2E 오토플레이에서 호출)
+# 한 줄 진행(탭/E2E). 타이핑 중이면 먼저 완성, 아니면 다음 줄.
 func advance() -> void:
+	if _typing:
+		if _tw != null and _tw.is_valid():
+			_tw.kill()
+		_text.visible_ratio = 1.0
+		_typing = false
+		_hint.visible = true
+		return
 	_i += 1
 	_show_current()
 
