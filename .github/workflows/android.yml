@@ -1,4 +1,4 @@
-name: Build Android APK → Release
+name: Build APK + Deploy Web
 
 on:
   push:
@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 env:
   GODOT_VERSION: "4.6.3"
@@ -115,5 +117,51 @@ jobs:
           body: |
             한눈에 보는 성경 이야기 — 항해 · 디버그 APK (커밋 ${{ github.sha }})
             사이드로드하여 테스트하세요. (com.onescrollbible.voyage)
+            웹 플레이: https://jungrok5.github.io/one-scroll-bible-game/
           prerelease: true
           files: build/bible-voyage.apk
+
+  deploy-web:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} + export templates
+        run: |
+          set -e
+          cd /tmp
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          wget -q "${base}/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          wget -q "${base}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          unzip -q "Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mv templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+
+      - name: Export Web (release)
+        run: |
+          set -e
+          mkdir -p build/web
+          godot --headless --path . --import || true
+          godot --headless --path . --export-release "Web" build/web/index.html
+          touch build/web/.nojekyll
+          ls -la build/web
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

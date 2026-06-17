@@ -74,9 +74,13 @@
 - 산출물 ~77MB(디버그). 사용자는 **APK 사이드로드로 테스트**.
 
 ## CI / 릴리스 규칙 (사용자 요구)
-- **`.github/workflows/android.yml`** — 브랜치 push마다 자동으로 Godot/SDK 설치 → APK 빌드 →
-  **GitHub Releases에 APK 업로드**(태그 `apk-build-<run>`, prerelease). `workflow_dispatch`로 수동 실행도 가능.
-- **푸시할 때마다 APK가 릴리스에 올라가야 함** — 워크플로 깨지면 최우선 수정. CI 로그는 MCP `actions_*`로 모니터.
+- **`.github/workflows/android.yml`** — 브랜치 push마다 자동으로 두 잡 실행:
+  - `build-apk`: Godot/SDK 설치 → APK 빌드 → **GitHub Releases 업로드**(태그 `apk-build-<run>`, prerelease).
+  - `deploy-web`: Web(release) export → **GitHub Pages 배포**. 공개 URL: **https://jungrok5.github.io/one-scroll-bible-game/**
+  - `workflow_dispatch`로 수동 실행도 가능. permissions: contents/pages/id-token write.
+- **푸시할 때마다 APK가 릴리스에, 웹이 Pages에 갱신돼야 함** — 워크플로 깨지면 최우선 수정. CI 로그는 MCP `actions_*`로 모니터.
+- 웹은 **GitHub Pages 제약(COOP/COEP 헤더 불가) → 반드시 `variant/thread_support=false`(싱글스레드)** 로 export.
+- 웹 빌드 검증: 로컬에서 `python3 -m http.server` + Playwright Chromium(`/opt/pw-browsers`, `--enable-unsafe-swiftshader`)으로 부팅·렌더 스크린샷 확인(`docs/screenshots/web_*`).
 
 ## 함정 / 주의
 - **Edit 전 해당 파일을 이 세션에서 Read 必**.
